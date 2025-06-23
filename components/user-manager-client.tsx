@@ -23,10 +23,10 @@ import { ProfileWithRole, Role } from "@/lib/types";
 
 interface UserManagerClientProps {
   initialProfiles: ProfileWithRole[];
-  initialTotalProfiles: number; // NEW: Total count from server
-  initialPage: number; // NEW: Initial page from server
-  initialSearchQuery: string; // NEW: Initial search query from server
-  adminPageSize: number; // NEW: Page size from server
+  initialTotalProfiles: number;
+  initialPage: number;
+  initialSearchQuery: string;
+  adminPageSize: number;
 }
 
 const newUserSchema = z.object({
@@ -46,10 +46,26 @@ export function UserManagerClient({
 }: UserManagerClientProps) {
   const [profiles, setProfiles] = useState<ProfileWithRole[]>(initialProfiles);
   const [roles, setRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [creationSuccess, setCreationSuccess] = useState<string | null>(null);
+
+  // NEW: Separate error/success states for create user form
+  const [createUserError, setCreateUserError] = useState<string | null>(null);
+  const [createUserSuccess, setCreateUserSuccess] = useState<string | null>(
+    null
+  );
+
+  // NEW: Separate error/success states for manage users table operations
+  const [manageUserError, setManageUserError] = useState<string | null>(null);
+  const [manageUserSuccess, setManageUserSuccess] = useState<string | null>(
+    null
+  );
+
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // NEW: Granular loading states
+  const [isFetchingUsers, setIsFetchingUsers] = useState(true); // For main table data fetch
+  const [isCreatingUser, setIsCreatingUser] = useState(false); // For new user form submission
+  const [isUpdatingRole, setIsUpdatingRole] = useState<string | null>(null); // Stores profileId being updated
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null); // Stores profileId being deleted
 
   // Pagination and Search states
   const [currentPage, setCurrentPage] = useState(initialPage);
@@ -64,7 +80,6 @@ export function UserManagerClient({
     formState: { errors: newUserErrors },
     reset: resetNewUserForm,
     setValue,
-    watch,
   } = useForm<NewUserData>({
     resolver: zodResolver(newUserSchema),
     defaultValues: {
@@ -72,7 +87,6 @@ export function UserManagerClient({
     },
   });
 
-  // Effect to set initial default role for the new user form
   useEffect(() => {
     if (roles.length > 0 && selectedNewUserRole === "") {
       const defaultRole = roles.find((r) => r.name === "user");
@@ -83,7 +97,6 @@ export function UserManagerClient({
     }
   }, [roles, selectedNewUserRole, setValue]);
 
-  // Fetch current user ID on mount
   useEffect(() => {
     const fetchUser = async () => {
       const {
@@ -96,30 +109,30 @@ export function UserManagerClient({
     fetchUser();
   }, []);
 
-  // Fetch roles dynamically
   useEffect(() => {
     const fetchRoles = async () => {
-      setLoading(true);
+      // This is a static fetch, no need for a dedicated loading state unless it's slow
+      // We can use isFetchingUsers if it's the only initial load.
+      setIsFetchingUsers(true);
       const { data, error } = await supabase
         .from("roles")
         .select("*")
         .order("name");
       if (error) {
         console.error("Error fetching roles:", error);
-        setError("Failed to load roles.");
+        setManageUserError("Failed to load roles."); // Use manageUserError for global admin errors
       } else {
         setRoles(data as Role[]);
       }
-      setLoading(false);
+      setIsFetchingUsers(false);
     };
     fetchRoles();
   }, []);
 
-  // --- NEW: Client-side data fetching for pagination/search ---
   const fetchUsers = useCallback(
     async (page: number, query: string) => {
-      setLoading(true);
-      setError(null); // Clear previous errors
+      setIsFetchingUsers(true); // Set loading for fetching users
+      setManageUserError(null); // Clear previous errors for user list
 
       const from = page * adminPageSize;
       const to = from + adminPageSize - 1;
@@ -150,69 +163,75 @@ export function UserManagerClient({
 
       if (fetchError) {
         console.error("Error fetching users:", fetchError);
-        setError("Failed to load users.");
+        setManageUserError("Failed to load users.");
         setProfiles([]);
         setTotalProfiles(0);
       } else {
         setProfiles(fetchedProfiles as ProfileWithRole[]);
         setTotalProfiles(count || 0);
       }
-      setLoading(false);
+      setIsFetchingUsers(false); // End loading for fetching users
     },
     [adminPageSize]
-  ); // Dependency on adminPageSize
+  );
 
-  // Effect to re-fetch data when currentPage or searchQuery changes
   useEffect(() => {
     fetchUsers(currentPage, searchQuery);
-  }, [currentPage, searchQuery, fetchUsers]); // Add fetchUsers to dependencies
+  }, [currentPage, searchQuery, fetchUsers]);
 
   const handleRoleChange = async (profileId: string, newRoleName: string) => {
-    setError(null);
-    setCreationSuccess(null);
-    setLoading(true);
+    setManageUserError(null);
+    setManageUserSuccess(null);
+    setIsUpdatingRole(profileId); // Set specific user as loading
 
     const newRoleId = roles.find((role) => role.name === newRoleName)?.id;
 
     if (!newRoleId) {
-      setError("Invalid role selected.");
-      setLoading(false);
+      setManageUserError("Invalid role selected.");
+      setIsUpdatingRole(null);
       return;
     }
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({ role_id: newRoleId })
-      .eq("id", profileId);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ role_id: newRoleId })
+        .eq("id", profileId);
 
-    if (error) {
-      console.error("Error updating user role:", error);
-      setError(
-        `Failed to update role for ${profileId.substring(0, 8)}...: ${
-          error.message
-        }`
+      if (error) {
+        console.error("Error updating user role:", error);
+        setManageUserError(
+          `Failed to update role for ${profileId.substring(0, 8)}...: ${
+            error.message
+          }`
+        );
+      } else {
+        setProfiles((prevProfiles) =>
+          prevProfiles.map((profile) =>
+            profile.id === profileId
+              ? { ...profile, role: [{ id: newRoleId, name: newRoleName }] }
+              : profile
+          )
+        );
+        console.log(`Role for ${profileId} updated to ${newRoleName}`);
+        setManageUserSuccess(
+          `Role for ${profileId.substring(0, 8)}... updated to ${newRoleName}`
+        );
+      }
+    } catch (err: any) {
+      console.error("Error updating user role (catch block):", err);
+      setManageUserError(
+        err.message || "An unexpected error occurred while updating role."
       );
-    } else {
-      // Optimistically update UI
-      setProfiles((prevProfiles) =>
-        prevProfiles.map((profile) =>
-          profile.id === profileId
-            ? { ...profile, role: [{ id: newRoleId, name: newRoleName }] }
-            : profile
-        )
-      );
-      console.log(`Role for ${profileId} updated to ${newRoleName}`);
-      setCreationSuccess(
-        `Role for ${profileId.substring(0, 8)}... updated to ${newRoleName}`
-      );
+    } finally {
+      setIsUpdatingRole(null); // End loading for this specific user
     }
-    setLoading(false);
   };
 
   const handleCreateUser = async (data: NewUserData) => {
-    setError(null);
-    setCreationSuccess(null);
-    setLoading(true);
+    setCreateUserError(null); // Clear errors for create form
+    setCreateUserSuccess(null); // Clear success for create form
+    setIsCreatingUser(true); // Set loading for create user operation
 
     try {
       const { email, password, role: roleName } = data;
@@ -240,25 +259,28 @@ export function UserManagerClient({
         throw new Error(result.error || "Failed to create user via admin.");
       }
 
-      setCreationSuccess(
+      setCreateUserSuccess(
         `User "${email}" created with role "${roleName}" successfully!`
       );
       resetNewUserForm();
-      setSelectedNewUserRole(""); // Reset the local state for the Select as well
+      setSelectedNewUserRole("");
       setCurrentPage(0); // Go back to the first page to see the new user
       setSearchQuery(""); // Clear search query to ensure new user is visible
       // Data will re-fetch via useEffect due to currentPage/searchQuery change
     } catch (err: any) {
       console.error("Error creating user:", err);
-      setError(err.message || "An error occurred during user creation.");
+      setCreateUserError(
+        err.message || "An error occurred during user creation."
+      );
     } finally {
-      setLoading(false);
+      setIsCreatingUser(false); // End loading for create user operation
     }
   };
 
   const handleDeleteUser = async (userIdToDelete: string) => {
-    setError(null);
-    setCreationSuccess(null);
+    setManageUserError(null);
+    setManageUserSuccess(null);
+    setDeletingUserId(userIdToDelete); // Set specific user as loading
 
     // Using browser confirm, ideally replace with a custom modal
     if (
@@ -269,10 +291,9 @@ export function UserManagerClient({
         )}...? This cannot be undone.`
       )
     ) {
+      setDeletingUserId(null); // Clear loading if cancelled
       return;
     }
-
-    setLoading(true);
 
     try {
       const {
@@ -298,7 +319,7 @@ export function UserManagerClient({
         throw new Error(result.error || "Failed to delete user.");
       }
 
-      setCreationSuccess(
+      setManageUserSuccess(
         `User ${userIdToDelete.substring(0, 8)}... deleted successfully.`
       );
       setCurrentPage(0); // Go back to first page after deletion
@@ -310,13 +331,14 @@ export function UserManagerClient({
       }
     } catch (err: any) {
       console.error("Error deleting user:", err);
-      setError(err.message || "An error occurred during user deletion.");
+      setManageUserError(
+        err.message || "An error occurred during user deletion."
+      );
     } finally {
-      setLoading(false);
+      setDeletingUserId(null); // End loading for this specific user
     }
   };
 
-  // Handlers for pagination
   const totalPages = Math.ceil(totalProfiles / adminPageSize);
 
   const goToPreviousPage = () => {
@@ -331,43 +353,55 @@ export function UserManagerClient({
     }
   };
 
-  // Handler for search input changes
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-    setCurrentPage(0); // Reset to first page on new search
+    setCurrentPage(0);
   };
 
-  if (loading && profiles.length === 0 && roles.length === 0) {
+  if (isFetchingUsers && profiles.length === 0 && roles.length === 0) {
     return (
       <div className="flex justify-center items-center h-48">
-        <p>Loading user management...</p>
+        <p className="text-gray-700">Loading user management...</p>
       </div>
     );
   }
 
   return (
-    <>
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Add New User</CardTitle>
-          {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
-          {creationSuccess && (
-            <p className="text-green-500 text-sm mt-2">{creationSuccess}</p>
+    <div className="space-y-8">
+      {/* Add New User Card */}
+      <Card className="rounded-xl shadow-lg p-4 md:p-8 border border-blue-100 bg-white">
+        <CardHeader className="text-center pb-6">
+          <CardTitle className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+            Add New User
+          </CardTitle>
+          <p className="text-gray-600 text-lg">
+            Create new user accounts and assign their roles.
+          </p>
+          {createUserError && ( // Use specific error state
+            <p className="text-red-600 text-sm mt-4 p-2 border border-red-300 bg-red-50 rounded-md">
+              {createUserError}
+            </p>
+          )}
+          {createUserSuccess && ( // Use specific success state
+            <p className="text-green-600 text-sm mt-4 p-2 border border-green-300 bg-green-50 rounded-md">
+              {createUserSuccess}
+            </p>
           )}
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(handleCreateUser)} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit(handleCreateUser)} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="newUserEmail">Email</Label>
                 <Input
                   id="newUserEmail"
                   type="email"
                   {...register("email")}
-                  disabled={loading}
+                  disabled={isCreatingUser} // Disable based on specific loading state
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
                 />
                 {newUserErrors.email && (
-                  <p className="text-red-500 text-sm">
+                  <p className="text-red-600 text-sm">
                     {newUserErrors.email.message}
                   </p>
                 )}
@@ -378,10 +412,11 @@ export function UserManagerClient({
                   id="newUserPassword"
                   type="password"
                   {...register("password")}
-                  disabled={loading}
+                  disabled={isCreatingUser} // Disable based on specific loading state
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
                 />
                 {newUserErrors.password && (
-                  <p className="text-red-500 text-sm">
+                  <p className="text-red-600 text-sm">
                     {newUserErrors.password.message}
                   </p>
                 )}
@@ -395,9 +430,9 @@ export function UserManagerClient({
                   setSelectedNewUserRole(value);
                   setValue("role", value, { shouldValidate: true });
                 }}
-                disabled={loading}
+                disabled={isCreatingUser || isFetchingUsers} // Disable based on specific loading states
               >
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full md:w-[180px] rounded-md px-3 py-2 border border-gray-300 focus:ring-blue-500 focus:border-blue-500">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -409,24 +444,42 @@ export function UserManagerClient({
                 </SelectContent>
               </Select>
               {newUserErrors.role && (
-                <p className="text-red-500 text-sm">
+                <p className="text-red-600 text-sm">
                   {newUserErrors.role.message}
                 </p>
               )}
             </div>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Creating..." : "Create New User"}
-            </Button>
+            <div className="flex justify-center pt-4">
+              <Button
+                type="submit"
+                disabled={isCreatingUser} // Disable based on specific loading state
+                className="w-full md:w-auto px-8 py-3 text-lg font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200 ease-in-out bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isCreatingUser ? "Creating..." : "Create New User"}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Manage Existing Users</CardTitle>
-          {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
-          {creationSuccess && (
-            <p className="text-green-500 text-sm mt-2">{creationSuccess}</p>
+      {/* Manage Existing Users Card */}
+      <Card className="rounded-xl shadow-lg p-4 md:p-8 border border-blue-100 bg-white">
+        <CardHeader className="text-center pb-6">
+          <CardTitle className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+            Manage Existing Users
+          </CardTitle>
+          <p className="text-gray-600 text-lg">
+            View, search, and update roles for existing users.
+          </p>
+          {manageUserError && ( // Use specific error state
+            <p className="text-red-600 text-sm mt-4 p-2 border border-red-300 bg-red-50 rounded-md">
+              {manageUserError}
+            </p>
+          )}
+          {manageUserSuccess && ( // Use specific success state
+            <p className="text-green-600 text-sm mt-4 p-2 border border-green-300 bg-green-50 rounded-md">
+              {manageUserSuccess}
+            </p>
           )}
         </CardHeader>
         <CardContent>
@@ -434,54 +487,59 @@ export function UserManagerClient({
           <div className="mb-6">
             <Input
               type="text"
-              placeholder="Search by full name..."
+              placeholder="Search users by full name..."
               value={searchQuery}
               onChange={handleSearchChange}
-              className="w-full max-w-md mx-auto block"
+              disabled={
+                isFetchingUsers ||
+                isUpdatingRole !== null ||
+                deletingUserId !== null
+              } // Disable during any operation
+              className="w-full max-w-md mx-auto block rounded-md px-3 py-2 border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-blue-50">
                 <tr>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider"
                   >
                     User ID
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider"
                   >
                     Full Name (Email)
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider"
                   >
                     Current Role
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider"
                   >
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {profiles.length === 0 && !loading && searchQuery ? (
+                {isFetchingUsers && profiles.length === 0 ? (
                   <tr>
                     <td
                       colSpan={4}
                       className="px-6 py-4 text-center text-gray-500"
                     >
-                      No matching users found.
+                      Loading users...
                     </td>
                   </tr>
-                ) : profiles.length === 0 && !loading && !searchQuery ? (
+                ) : profiles.length === 0 && !searchQuery ? (
                   <tr>
                     <td
                       colSpan={4}
@@ -490,24 +548,40 @@ export function UserManagerClient({
                       No users found.
                     </td>
                   </tr>
+                ) : profiles.length === 0 && searchQuery ? (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="px-6 py-4 text-center text-gray-500"
+                    >
+                      No matching users found for "{searchQuery}".
+                    </td>
+                  </tr>
                 ) : (
                   profiles.map((profile) => (
-                    <tr key={profile.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <tr
+                      key={profile.id}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         {profile.id.substring(0, 8)}...
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {profile.full_name || "N/A"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         <Select
                           value={profile.role?.[0]?.name || ""}
                           onValueChange={(newRoleName) =>
                             handleRoleChange(profile.id, newRoleName)
                           }
-                          disabled={loading}
+                          disabled={
+                            isUpdatingRole === profile.id ||
+                            deletingUserId !== null ||
+                            isFetchingUsers
+                          } // Disable if this user's role is updating OR any user is deleting OR fetching
                         >
-                          <SelectTrigger className="w-[180px]">
+                          <SelectTrigger className="w-full md:w-[180px] rounded-md px-3 py-2 border border-gray-300 focus:ring-blue-500 focus:border-blue-500">
                             <SelectValue placeholder="Select a role" />
                           </SelectTrigger>
                           <SelectContent>
@@ -519,14 +593,22 @@ export function UserManagerClient({
                           </SelectContent>
                         </Select>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         <Button
                           variant="destructive"
                           size="sm"
                           onClick={() => handleDeleteUser(profile.id)}
-                          disabled={loading || currentUserId === profile.id}
+                          disabled={
+                            deletingUserId === profile.id || // Disable if this user is being deleted
+                            isCreatingUser || // Disable if new user is being created
+                            isUpdatingRole !== null || // Disable if any role is being updated
+                            currentUserId === profile.id // Always disable deleting self
+                          }
+                          className="shadow-sm hover:shadow-md transition-shadow"
                         >
-                          Delete
+                          {deletingUserId === profile.id
+                            ? "Deleting..."
+                            : "Delete"}
                         </Button>
                       </td>
                     </tr>
@@ -537,21 +619,35 @@ export function UserManagerClient({
           </div>
           {/* Pagination Controls */}
           {totalPages > 1 && (
-            <div className="flex justify-center items-center space-x-4 mt-8">
+            <div className="flex justify-center items-center space-x-4 mt-8 py-3 bg-gray-50 rounded-lg border border-gray-200">
               <Button
                 onClick={goToPreviousPage}
-                disabled={currentPage === 0 || loading}
+                disabled={
+                  currentPage === 0 ||
+                  isFetchingUsers ||
+                  isCreatingUser ||
+                  isUpdatingRole !== null ||
+                  deletingUserId !== null
+                }
                 variant="outline"
+                className="shadow-sm hover:shadow-md transition-shadow"
               >
                 Previous
               </Button>
-              <span className="text-gray-700">
+              <span className="text-gray-700 font-medium">
                 Page {currentPage + 1} of {totalPages}
               </span>
               <Button
                 onClick={goToNextPage}
-                disabled={currentPage === totalPages - 1 || loading}
+                disabled={
+                  currentPage === totalPages - 1 ||
+                  isFetchingUsers ||
+                  isCreatingUser ||
+                  isUpdatingRole !== null ||
+                  deletingUserId !== null
+                }
                 variant="outline"
+                className="shadow-sm hover:shadow-md transition-shadow"
               >
                 Next
               </Button>
@@ -559,6 +655,6 @@ export function UserManagerClient({
           )}
         </CardContent>
       </Card>
-    </>
+    </div>
   );
 }

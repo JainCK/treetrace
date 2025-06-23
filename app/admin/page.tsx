@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { ProfileWithRole, UserProfileWithSingleRole } from "@/lib/types";
 import { UserManagerClient } from "@/components/user-manager-client";
+import Link from "next/link"; // Import Link for navigation
 
 // Define page size for consistency
 const ADMIN_PAGE_SIZE = 10; // Display 10 users per page on admin panel
@@ -73,10 +74,6 @@ async function getUsersData(
 
   // Apply search filter if a query is provided
   if (searchQuery) {
-    // Search across full_name or email (email is not directly in profiles table,
-    // but often full_name is initialized with email).
-    // For more robust search across auth.users.email, you'd need a separate Edge Function or RPC.
-    // For now, we'll search full_name as that's directly available in profiles.
     query = query.ilike("full_name", `%${searchQuery}%`);
   }
 
@@ -116,16 +113,42 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     isAdmin,
   } = await getUsersData(page, searchQuery);
 
-  // If for some reason the isAdmin check in getUsersData failed here, it would redirect.
-  // This return assumes isAdmin is true if we reached here.
-
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-100 py-8 md:py-12 font-inter">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">
-          Admin Dashboard
-        </h1>
-        {/* Pass props including new pagination/search info */}
+        <div className="flex justify-between items-center mb-8">
+          {" "}
+          {/* Flex container for back button and title */}
+          <Link
+            href="/dashboard"
+            className="text-blue-600 hover:text-blue-800 transition-colors flex items-center space-x-1 text-lg font-medium"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+            <span>Back to Dashboard</span>
+          </Link>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 text-center leading-tight flex-grow">
+            {" "}
+            {/* Flex-grow to center title */}
+            Admin Dashboard
+          </h1>
+          {/* Invisible element to balance spacing if needed */}
+          <div className="w-[180px] hidden md:block"></div>{" "}
+          {/* Adjust width to match button space if needed */}
+        </div>
+
         <UserManagerClient
           initialProfiles={profiles}
           initialTotalProfiles={totalProfiles}
