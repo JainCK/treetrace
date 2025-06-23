@@ -1,72 +1,172 @@
 // app/dashboard/page.tsx
 "use client";
 
-import { useState, useEffect } from "react"; // Import useEffect and useState
-import { useRouter } from "next/navigation"; // Import useRouter
-import { supabase } from "@/utils/supabase/client";
-import { TreeWithImages } from "@/lib/types";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/utils/supabase/client"; // Client-side Supabase
+import { TreeWithImages, UserProfileWithSingleRole } from "@/lib/types"; // Import types
 import { TreeCard } from "@/components/tree-card";
-import { LogoutButton } from "@/components/logout-button";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { User } from "@supabase/supabase-js"; // Import Supabase User type
+import { Input } from "@/components/ui/input"; // Import Input component for search
 
-// We'll move the redirect logic from here,
-// and make getTrees a regular async function that can be called.
-async function fetchTrees(userId: string): Promise<TreeWithImages[]> {
-  const { data: trees, error } = await supabase
+// Define page size for pagination
+const PAGE_SIZE = 12; // Display 12 trees per page
+
+// Modified fetchTrees to include pagination, count, and search
+async function fetchTrees(
+  page: number,
+  pageSize: number,
+  searchQuery: string
+): Promise<{ trees: TreeWithImages[]; count: number }> {
+  const from = page * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = supabase
     .from("trees")
     .select(
       `
       *,
       tree_images (*)
-    `
+    `,
+      { count: "exact" } // Request exact count for pagination
     )
-    .eq("user_id", userId)
     .order("created_at", { ascending: false });
+
+  // Apply search filter if a query is provided
+  if (searchQuery) {
+    // Search across common_name and scientific_name
+    query = query.or(
+      `common_name.ilike.%${searchQuery}%,scientific_name.ilike.%${searchQuery}%`
+    );
+  }
+
+  const { data: trees, error, count } = await query.range(from, to); // Fetch only the items for the current page
 
   if (error) {
     console.error("Error fetching trees:", error);
-    return [];
+    return { trees: [], count: 0 };
   }
 
-  return trees as TreeWithImages[];
+  return { trees: trees as TreeWithImages[], count: count || 0 };
 }
 
 export default function DashboardPage() {
-  const router = useRouter(); // Initialize useRouter
-  const [user, setUser] = useState<any>(null); // State to hold user info
-  const [trees, setTrees] = useState<TreeWithImages[]>([]); // State to hold trees
-  const [loading, setLoading] = useState(true); // Loading state for initial fetch
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null); // State to hold user info
+  const [trees, setTrees] = useState<TreeWithImages[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false); // State for admin status
+  const [currentPage, setCurrentPage] = useState(0); // Current page (0-indexed)
+  const [totalTrees, setTotalTrees] = useState(0); // Total number of trees
+  const [searchQuery, setSearchQuery] = useState(""); // State for search query
+
+  // Memoized function for fetching data, depends on currentPage and searchQuery
+  const fetchData = useCallback(async (page: number, query: string) => {
+    setLoading(true);
+    // Note: Errors from fetchTrees are logged internally there.
+    const { trees: fetchedTrees, count: fetchedCount } = await fetchTrees(
+      page,
+      PAGE_SIZE,
+      query
+    );
+    setTrees(fetchedTrees);
+    setTotalTrees(fetchedCount);
+    setLoading(false);
+  }, []); // No dependencies for fetchData itself to avoid re-creating on every render
 
   useEffect(() => {
-    // This effect runs once on component mount
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        // User is logged in
         setUser(session.user);
-        // Fetch trees only when user is confirmed
-        const userTrees = await fetchTrees(session.user.id);
-        setTrees(userTrees);
-        setLoading(false);
+
+        // Fetch user's profile to determine role client-side
+        const { data: userProfileData, error: userProfileError } =
+          (await supabase
+            .from("profiles")
+            .select(
+              `
+            id,
+            full_name,
+            role:role_id (
+              id,
+              name
+            )
+          `
+            )
+            .eq("id", session.user.id)
+            .single()) as {
+            data: UserProfileWithSingleRole | null;
+            error: any;
+          };
+
+        if (userProfileError) {
+          console.error(
+            "Error fetching user profile for dashboard:",
+            userProfileError
+          );
+        } else if (
+          userProfileData &&
+          userProfileData.role &&
+          userProfileData.role.name === "admin"
+        ) {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
+
+        // Initial fetch with current page and search query
+        await fetchData(currentPage, searchQuery);
       } else {
-        // No user session, redirect to login
         setUser(null);
         setTrees([]);
+        setIsAdmin(false);
         setLoading(false);
-        router.push("/"); // Use router.push for client-side navigation
+        router.push("/");
       }
     });
 
-    // Cleanup subscription on component unmount
     return () => {
       subscription.unsubscribe();
     };
-  }, [router]); // Depend on router to ensure effect logic is stable
+  }, [router, fetchData, currentPage, searchQuery]); // Add searchQuery to dependencies
 
-  // Show a loading indicator while checking auth state and fetching data
-  if (loading) {
+  // Handlers for pagination
+  const totalPages = Math.ceil(totalTrees / PAGE_SIZE);
+
+  const goToPreviousPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages - 1) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  // Handler for search input changes
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(0); // Reset to first page on new search
+  };
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (!error) {
+      router.push("/");
+    } else {
+      console.error("Logout error:", error.message);
+      alert("Failed to log out. Please try again.");
+    }
+  };
+
+  if (loading && trees.length === 0 && !user) {
+    // More precise loading state
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <p>Loading dashboard...</p>
@@ -74,12 +174,8 @@ export default function DashboardPage() {
     );
   }
 
-  // If after loading, there's no user, it means the redirect to '/' should have already happened
-  // This is a fallback, primarily, as the useEffect should handle the redirect.
   if (!user) {
-    // If we somehow get here without a user, ensure redirect.
-    // This path should ideally be handled by the useEffect above.
-    return null;
+    return null; // Should redirect via useEffect if no user
   }
 
   return (
@@ -91,34 +187,81 @@ export default function DashboardPage() {
               Tree Management
             </h1>
             <div className="flex space-x-4">
-              <Link href="/trees/new">
-                <Button>Add New Tree</Button>
-              </Link>
-              <LogoutButton />
+              {isAdmin && ( // Conditionally render Admin button
+                <Link href="/admin">
+                  <Button variant="outline">Admin Panel</Button>
+                </Link>
+              )}
+              {isAdmin && ( // Only show "Add New Tree" for admins
+                <Link href="/trees/new">
+                  <Button>Add New Tree</Button>
+                </Link>
+              )}
+              <Button onClick={handleLogout}>Logout</Button>
             </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {trees.length === 0 ? (
+        {/* Search Input */}
+        <div className="mb-6">
+          <Input
+            type="text"
+            placeholder="Search by common or scientific name..."
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="w-full max-w-md mx-auto block"
+          />
+        </div>
+
+        {trees.length === 0 && !loading ? ( // Display "No trees found" only if truly empty after loading
           <div className="text-center py-12">
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              No trees found
+              {searchQuery ? "No matching trees found." : "No trees found."}
             </h3>
             <p className="text-gray-600 mb-4">
-              Get started by adding your first tree.
+              {isAdmin
+                ? "Get started by adding your first tree."
+                : "No trees available for your account."}
             </p>
-            <Link href="/trees/new">
-              <Button>Add Your First Tree</Button>
-            </Link>
+            {isAdmin && (
+              <Link href="/trees/new">
+                <Button>Add Your First Tree</Button>
+              </Link>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {trees.map((tree) => (
-              <TreeCard key={tree.id} tree={tree} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {trees.map((tree) => (
+                <TreeCard key={tree.id} tree={tree} />
+              ))}
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center space-x-4 mt-8">
+                <Button
+                  onClick={goToPreviousPage}
+                  disabled={currentPage === 0 || loading}
+                  variant="outline"
+                >
+                  Previous
+                </Button>
+                <span className="text-gray-700">
+                  Page {currentPage + 1} of {totalPages}
+                </span>
+                <Button
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages - 1 || loading}
+                  variant="outline"
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
