@@ -25,7 +25,7 @@ async function getTree(id: string): Promise<TreeWithImages | null> {
     `
     )
     .eq("id", id)
-    .eq("user_id", user.id)
+    // .eq("user_id", user.id)
     .single();
 
   if (error) {
