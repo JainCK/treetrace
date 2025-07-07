@@ -147,261 +147,254 @@ export function TreeDetailClient({ tree, isAdmin }: TreeDetailClientProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
-      {/* Hero Section with Images */}
-      <div className="relative">
-        {tree.tree_images && tree.tree_images.length > 0 ? (
-          <div className="relative h-[50vh] md:h-[60vh] w-full overflow-hidden">
-            <Image
-              src={tree.tree_images[0].image_url || "/placeholder.svg"}
-              alt={tree.common_name}
-              fill
-              className="object-cover"
-              priority
-              sizes="100vw"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-
-            {/* Header Content Overlay */}
-            <div className="absolute inset-0 flex flex-col justify-end">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-                  <div>
-                    <Link
-                      href="/dashboard"
-                      className="inline-flex items-center text-white/90 hover:text-white transition-colors mb-4 bg-black/20 backdrop-blur-sm px-3 py-2 rounded-full"
-                    >
-                      <ArrowLeft className="h-4 w-4 mr-2" />
-                      <span>Back to Dashboard</span>
-                    </Link>
-
-                    <h1 className="text-4xl md:text-6xl font-bold text-white mb-2 drop-shadow-lg">
-                      {tree.common_name}
-                    </h1>
-                    <p className="text-blue-100 italic text-xl md:text-2xl font-light">
-                      {tree.scientific_name}
-                    </p>
-
-                    {tree.is_premium && (
-                      <div className="inline-flex items-center mt-4 bg-gradient-to-r from-amber-400 to-yellow-500 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg">
-                        <Award className="h-4 w-4 mr-2" />
-                        Premium Tree
-                      </div>
-                    )}
-                  </div>
-
-                  {isAdmin && (
-                    <div className="flex space-x-3">
-                      <Link href={`/trees/${tree.id}/edit`}>
-                        <Button
-                          variant="outline"
-                          className="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20"
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </Button>
-                      </Link>
-                      <Button
-                        variant="destructive"
-                        onClick={handleDelete}
-                        disabled={loading}
-                        className="bg-red-500/80 backdrop-blur-sm hover:bg-red-600/90"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        {loading ? "Deleting..." : "Delete"}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-gradient-to-r from-blue-600 to-cyan-600 py-16">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center text-white/90 hover:text-white transition-colors mb-6"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                <span>Back to Dashboard</span>
-              </Link>
-
-              <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
-                {tree.common_name}
-              </h1>
-              <p className="text-blue-100 italic text-xl md:text-2xl">
-                {tree.scientific_name}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 -mt-8 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Image Gallery */}
-          {tree.tree_images && tree.tree_images.length > 0 && (
-            <div className="lg:col-span-1">
-              <Card className="bg-white/80 backdrop-blur-sm border-blue-100 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-blue-800 flex items-center">
-                    <Leaf className="h-5 w-5 mr-2" />
-                    Gallery
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {tree.tree_images.map((img, index) => (
-                      <div
-                        key={index}
-                        className="relative h-48 w-full rounded-lg overflow-hidden bg-gray-100 shadow-md cursor-pointer hover:shadow-lg transition-shadow group"
-                        onClick={() => openImageModal(index)}
-                      >
-                        <Image
-                          src={img.image_url || "/placeholder.svg"}
-                          alt={`${tree.common_name} ${index + 1}`}
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-300"
-                          sizes="(max-width: 1024px) 100vw, 33vw"
-                        />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-                          <div className="bg-white/90 backdrop-blur-sm rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span className="text-sm font-medium text-gray-800">
-                              View Full Size
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Details Section */}
-          <div
-            className={`${
-              tree.tree_images && tree.tree_images.length > 0
-                ? "lg:col-span-2"
-                : "lg:col-span-3"
-            } space-y-6`}
+    <div className="min-h-screen bg-gray-50">
+      {/* Simplified Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center text-gray-600 hover:text-gray-800 mb-4"
           >
-            {tree.description && (
-              <Card className="bg-white/80 backdrop-blur-sm border-blue-100 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-blue-800">Description</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-slate-700 leading-relaxed text-lg whitespace-pre-wrap">
-                    {tree.description}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Link>
 
-            {tree.facts && tree.facts.length > 0 && (
-              <Card className="bg-white/80 backdrop-blur-sm border-blue-100 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-blue-800">
-                    Interesting Facts
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {renderBoxedList(tree.facts as string)}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Premium Details */}
+          <div className="flex justify-between items-center">
             {tree.is_premium && (
-              <Card className="bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-amber-800 flex items-center">
-                    <Award className="h-5 w-5 mr-2" />
-                    Premium Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {tree.age && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-amber-800 mb-2">
-                        Age
-                      </h3>
-                      <p className="text-slate-700 text-lg">
-                        {tree.age} years old
-                      </p>
-                    </div>
-                  )}
+              <div className="inline-flex items-center bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm font-medium">
+                <Award className="h-4 w-4 mr-1" />
+                Premium Tree
+              </div>
+            )}
 
-                  {tree.biological_conditions && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-amber-800 mb-2">
-                        Biological Conditions
-                      </h3>
-                      <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">
-                        {tree.biological_conditions}
-                      </p>
-                    </div>
-                  )}
-
-                  {tree.care_timeline && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-amber-800 mb-3">
-                        Care Timeline
-                      </h3>
-                      {renderCareTimeline(tree.care_timeline)}
-                    </div>
-                  )}
-
-                  {tree.benefits && tree.benefits.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-amber-800 mb-3">
-                        Benefits
-                      </h3>
-                      {renderBoxedList(tree.benefits as string)}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+            {isAdmin && (
+              <div className="flex space-x-2">
+                <Link href={`/trees/${tree.id}/edit`}>
+                  <Button variant="outline" size="sm">
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                </Link>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDelete}
+                  disabled={loading}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {loading ? "Deleting..." : "Delete"}
+                </Button>
+              </div>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Full-width Map Section */}
-        {tree.latitude && tree.longitude && (
-          <Card className="mt-8 bg-white/80 backdrop-blur-sm border-blue-100 shadow-xl overflow-hidden">
-            <CardHeader>
-              <CardTitle className="text-blue-800 flex items-center">
-                <MapPin className="h-5 w-5 mr-2" />
-                Location
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="p-6 pb-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-semibold text-slate-600">
-                      Latitude:
+      {/* Main Content */}
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column - Images */}
+          <div className="space-y-4">
+            {/* Main Image */}
+            {tree.tree_images && tree.tree_images.length > 0 ? (
+              <>
+                <div className="relative h-80 rounded-lg overflow-hidden bg-gray-100 shadow-sm">
+                  <Image
+                    src={tree.tree_images[0].image_url || "/placeholder.svg"}
+                    alt={tree.common_name}
+                    fill
+                    className="object-cover"
+                    priority
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                  />
+                </div>
+
+                {/* Smaller thumbnail images */}
+                {tree.tree_images.length > 1 && (
+                  <div className="grid grid-cols-4 gap-2">
+                    {tree.tree_images.slice(1, 5).map((img, index) => (
+                      <div
+                        key={index + 1}
+                        className="relative h-16 rounded-md overflow-hidden bg-gray-100 cursor-pointer hover:opacity-75 transition-opacity"
+                        onClick={() => openImageModal(index + 1)}
+                      >
+                        <Image
+                          src={img.image_url || "/placeholder.svg"}
+                          alt={`${tree.common_name} ${index + 2}`}
+                          fill
+                          className="object-cover"
+                          sizes="64px"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="h-80 bg-gray-100 rounded-lg flex items-center justify-center">
+                <div className="text-center text-gray-500">
+                  <Leaf className="h-12 w-12 mx-auto mb-2" />
+                  <p>No images available</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column - Tree Details */}
+          <div className="space-y-6">
+            {/* Tree Names and Description Combined */}
+            <Card>
+              <CardHeader>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                    {tree.common_name}
+                  </h1>
+                  <p className="text-lg text-gray-600 italic mb-4">
+                    {tree.scientific_name}
+                  </p>
+                </div>
+              </CardHeader>
+              {tree.description && (
+                <CardContent>
+                  <p className="text-gray-700 leading-relaxed">
+                    {tree.description}
+                  </p>
+                </CardContent>
+              )}
+            </Card>
+          </div>
+        </div>
+
+        {/* Location Info - Full Width */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center">
+              <MapPin className="h-5 w-5 mr-2" />
+              Location Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {tree.location && (
+              <div>
+                <span className="font-medium text-gray-600">Location: </span>
+                <span className="text-gray-900">{tree.location}</span>
+              </div>
+            )}
+            {tree.landmark && (
+              <div>
+                <span className="font-medium text-gray-600">Landmark: </span>
+                <span className="text-gray-900">{tree.landmark}</span>
+              </div>
+            )}
+            {tree.carbon_footprint && (
+              <div>
+                <span className="font-medium text-gray-600">
+                  Carbon Absorption:{" "}
+                </span>
+                <span className="text-green-600 font-semibold">
+                  {tree.carbon_footprint} kg CO₂/year
+                </span>
+              </div>
+            )}
+            {tree.latitude && tree.longitude && (
+              <div className="pt-2 border-t">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-600">
+                      Latitude:{" "}
                     </span>
-                    <span className="text-blue-600 font-mono">
+                    <span className="text-gray-900 font-mono">
                       {tree.latitude}
                     </span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-semibold text-slate-600">
-                      Longitude:
+                  <div>
+                    <span className="font-medium text-gray-600">
+                      Longitude:{" "}
                     </span>
-                    <span className="text-blue-600 font-mono">
+                    <span className="text-gray-900 font-mono">
                       {tree.longitude}
                     </span>
                   </div>
                 </div>
               </div>
+            )}
+          </CardContent>
+        </Card>
 
-              <div className="w-full h-[400px] md:h-[500px] relative">
+        {/* Facts Section - Full Width */}
+        {tree.facts && tree.facts.length > 0 && (
+          <Card className="mt-8">
+            <CardHeader>
+              <CardTitle className="text-lg">Interesting Facts</CardTitle>
+            </CardHeader>
+            <CardContent>{renderBoxedList(tree.facts as string)}</CardContent>
+          </Card>
+        )}
+
+        {/* Premium Details Section - Full Width when available */}
+        {tree.is_premium && (
+          <Card className="mt-8 border-amber-200 bg-amber-50">
+            <CardHeader>
+              <CardTitle className="text-xl text-amber-800 flex items-center">
+                <Award className="h-6 w-6 mr-2" />
+                Premium Tree Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {tree.age && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-amber-700">Age</h4>
+                    <p className="text-amber-900 text-lg font-semibold">
+                      {tree.age} years old
+                    </p>
+                  </div>
+                )}
+
+                {tree.biological_conditions && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-amber-700">
+                      Biological Conditions
+                    </h4>
+                    <p className="text-amber-900 leading-relaxed text-sm">
+                      {tree.biological_conditions}
+                    </p>
+                  </div>
+                )}
+
+                {tree.care_timeline && (
+                  <div className="md:col-span-2 space-y-3">
+                    <h4 className="font-medium text-amber-700 text-lg">
+                      Care Timeline
+                    </h4>
+                    {renderCareTimeline(tree.care_timeline)}
+                  </div>
+                )}
+
+                {tree.benefits && tree.benefits.length > 0 && (
+                  <div className="md:col-span-2 space-y-3">
+                    <h4 className="font-medium text-amber-700 text-lg">
+                      Environmental Benefits
+                    </h4>
+                    {renderBoxedList(tree.benefits as string)}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Map Section */}
+        {tree.latitude && tree.longitude && (
+          <Card className="mt-8">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center">
+                <MapPin className="h-5 w-5 mr-2" />
+                Map Location
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="w-full h-80 rounded-b-lg overflow-hidden">
                 <iframe
                   src={getMapUrl()!}
                   width="100%"
