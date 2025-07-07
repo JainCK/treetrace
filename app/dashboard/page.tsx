@@ -10,6 +10,7 @@ import { TreeCard } from "@/components/tree-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import Image from "next/image";
 import type { User } from "@supabase/supabase-js";
 import {
   Search,
@@ -20,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Leaf,
+  MapPin,
 } from "lucide-react";
 
 const PAGE_SIZE = 12;
@@ -45,7 +47,7 @@ async function fetchTrees(
 
   if (searchQuery) {
     query = query.or(
-      `common_name.ilike.%${searchQuery}%,scientific_name.ilike.%${searchQuery}%`
+      `common_name.ilike.%${searchQuery}%,scientific_name.ilike.%${searchQuery}%,location.ilike.%${searchQuery}%,landmark.ilike.%${searchQuery}%`
     );
   }
 
@@ -183,18 +185,45 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
-      {/* Header */}
-      <div className="bg-white/80 backdrop-blur-sm shadow-lg border-b border-blue-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-6 gap-4">
-            <div className="flex items-center space-x-3">
-              <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-2 rounded-lg">
-                <Trees className="h-8 w-8 text-white" />
+      {/* Company Header Section */}
+      <div className="bg-white shadow-lg border-b border-blue-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="text-center mb-6">
+            <div className="flex items-center justify-center mb-4">
+              <div className="relative w-16 h-16 mr-4">
+                <Image
+                  src="/hindalcologo.jpg"
+                  alt="Hindalco Logo"
+                  fill
+                  className="object-contain rounded-lg"
+                  sizes="64px"
+                />
               </div>
               <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-800 to-cyan-700 bg-clip-text text-transparent">
-                  Tree Trace
+                <h1 className="text-4xl font-bold text-gray-900">
+                  Hindalco Pvt Limited
                 </h1>
+                <p className="text-lg text-gray-600 mt-1">
+                  Environmental Sustainability Initiative
+                </p>
+                <p className="text-sm text-gray-500 flex items-center justify-center mt-2">
+                  <MapPin className="h-4 w-4 mr-1" />
+                  Aditya Birla Group, Mumbai, Maharashtra
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* User Navigation */}
+          <div className="flex flex-col sm:flex-row justify-between items-center pt-4 border-t border-gray-200">
+            <div className="flex items-center space-x-3 mb-4 sm:mb-0">
+              <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-2 rounded-lg">
+                <Trees className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Tree Trace Dashboard
+                </h2>
                 <p className="text-blue-600 text-sm font-medium">
                   Welcome back, {user.email?.split("@")[0]}
                 </p>
@@ -239,10 +268,10 @@ export default function DashboardPage() {
         <div className="mb-8">
           <div className="max-w-4xl mx-auto ">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-16 w-8 text-blue-400" />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-6 w-6 text-blue-400" />
               <Input
                 type="text"
-                placeholder="Search by common or scientific name..."
+                placeholder="Search by name, scientific name, location, or landmark..."
                 value={searchQuery}
                 onChange={handleSearchChange}
                 className="pl-14 pr-6 py-5 w-full bg-white/80 backdrop-blur-sm border-blue-200 focus:border-blue-400 focus:ring-blue-400 rounded-2xl shadow-xl text-xl h-16"
