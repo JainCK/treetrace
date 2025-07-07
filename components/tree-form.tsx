@@ -22,6 +22,13 @@ const treeSchema = z.object({
   description: z.string().optional(),
   latitude: z.number().optional().nullable(),
   longitude: z.number().optional().nullable(),
+  location: z.string().optional().nullable(),
+  landmark: z.string().optional().nullable(),
+  carbon_footprint: z
+    .number()
+    .positive("Carbon footprint must be positive")
+    .optional()
+    .nullable(),
   is_premium: z.boolean().optional(),
   age: z
     .number()
@@ -70,6 +77,9 @@ export function TreeForm({ initialData, onSuccess }: TreeFormProps) {
             ? JSON.stringify(initialData.care_timeline, null, 2)
             : "",
           benefits: initialData.benefits ?? "",
+          location: initialData.location ?? "",
+          landmark: initialData.landmark ?? "",
+          carbon_footprint: initialData.carbon_footprint ?? undefined,
         }
       : {
           common_name: "",
@@ -83,6 +93,9 @@ export function TreeForm({ initialData, onSuccess }: TreeFormProps) {
           biological_conditions: "",
           care_timeline: "",
           benefits: "",
+          location: "",
+          landmark: "",
+          carbon_footprint: undefined,
         },
   });
 
@@ -182,6 +195,9 @@ export function TreeForm({ initialData, onSuccess }: TreeFormProps) {
             description: data.description || null,
             latitude: data.latitude || null,
             longitude: data.longitude || null,
+            location: data.location || null,
+            landmark: data.landmark || null,
+            carbon_footprint: data.carbon_footprint || null,
             ...premiumFields,
           })
           .eq("id", initialData.id);
@@ -201,6 +217,9 @@ export function TreeForm({ initialData, onSuccess }: TreeFormProps) {
             description: data.description || null,
             latitude: data.latitude || null,
             longitude: data.longitude || null,
+            location: data.location || null,
+            landmark: data.landmark || null,
+            carbon_footprint: data.carbon_footprint || null,
             ...premiumFields,
           })
           .select()
@@ -373,6 +392,54 @@ export function TreeForm({ initialData, onSuccess }: TreeFormProps) {
                   disabled={loading}
                   className="w-full rounded-md px-3 py-2 border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
                 />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="location">General Location (Optional)</Label>
+                <Input
+                  id="location"
+                  type="text"
+                  placeholder="e.g., Central Park, New York"
+                  {...register("location")}
+                  disabled={loading}
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="text-sm text-gray-600">
+                  Enter a descriptive location for easier searching
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="landmark">Landmark (Optional)</Label>
+                <Input
+                  id="landmark"
+                  type="text"
+                  placeholder="e.g., Near the main fountain"
+                  {...register("landmark")}
+                  disabled={loading}
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="text-sm text-gray-600">
+                  Nearby landmark or reference point
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="carbon_footprint">
+                  Carbon Footprint (Optional)
+                </Label>
+                <Input
+                  id="carbon_footprint"
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g., 22.5"
+                  {...register("carbon_footprint", { valueAsNumber: true })}
+                  disabled={loading}
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="text-sm text-gray-600">
+                  Annual CO₂ absorption in kg
+                </p>
               </div>
             </div>
           </div>

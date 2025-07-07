@@ -13,6 +13,9 @@ export interface Tree {
   biological_conditions?: string | null;
   care_timeline?: any | null; // Use 'any' for JSONB for now, will refine later if needed
   benefits?: string | null;
+  landmark?: string | null; // Optional landmark field
+  carbon_footprint?: number | null; // Optional carbon footprint in kg CO2
+  location?: string | null; // Optional general location field for search
 }
 
 export interface TreeImage {
